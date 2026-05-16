@@ -1,0 +1,61 @@
+#define BLYNK_TEMPLATE_ID      "ENTER_YOUR_BLYNK_TEMPLATE_ID"
+#define BLYNK_TEMPLATE_NAME    "ENTER_YOUR_BLYNK_TEMPLATE_NAME"
+#define BLYNK_AUTH_TOKEN       "ENTER_YOUR_BLYNK_AUTH_TOKEN"
+
+#include <WiFi.h>
+#include <BlynkSimpleEsp32.h>
+#include <EmonLib.h>
+#include <EEPROM.h>
+// Wi-Fi credentials
+const char ssid[] = "Mahesh";
+const char pass[] = "123456789";
+// Energy Monitor
+EnergyMonitor emon;
+BlynkTimer timer;
+float kWh = 0.0;
+unsigned long lastMillis = 0;
+void setup() {
+Serial.begin(115200);
+delay(100);
+// Connect to Blynk
+Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+// Initialize sensors (pins for ESP32-C6)
+// Adjust calibration factors as per your sensor module
+emon.voltage(4, 41.5, 1.7); // Pin 4 for voltage sensor
+emon.current(5, 0.15); // Pin 5 for current sensor
+// EEPROM for kWh storage
+EEPROM.begin(32);
+EEPROM.get(0, kWh);
+if (isnan(kWh)) kWh = 0.0;
+lastMillis = millis();
+// Send data every 5 sec
+timer.setInterval(5000L, sendEnergyDataToBlynk);
+}
+void loop() {
+Blynk.run();
+timer.run();
+}
+void sendEnergyDataToBlynk() {
+emon.calcVI(20, 2000);
+float Vrms = emon.Vrms;
+float Irms = emon.Irms;
+float realPower = emon.realPower;
+float pf = emon.powerFactor;
+// kWh calculation based on real power
+unsigned long currentMillis = millis();
+kWh += realPower * (currentMillis - lastMillis) / 3600000.0 / 1000.0;
+lastMillis = currentMillis;
+// Serial output
+Serial.printf("Vrms: %.2f | Irms: %.2f | RealPower: %.2f | PowerFactor: %.2f| kWh: %.4f\n", Vrms, Irms, realPower, pf, kWh);
+// Send to Blynk
+Blynk.virtualWrite(V0, Vrms);
+Blynk.virtualWrite(V1, Irms);
+Blynk.virtualWrite(V2, realPower);
+Blynk.virtualWrite(V3, pf);
+Blynk.virtualWrite(V4, kWh);
+EEPROM.put(0, kWh);
+EEPROM.commit();
+}
+EEPROM.get(0, kWh);
+if (isnan(kWh)) kWh = 0.0;
+lastMillis = millis();
