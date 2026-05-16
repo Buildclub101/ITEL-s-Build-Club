@@ -1,0 +1,95 @@
+#include <Arduino.h>
+#include <WiFi.h>
+#include <ESP_Mail_Client.h>
+#include <LittleFS.h>
+/* WiFi credentials */
+#define WIFI_SSID "YOUR_WIFI_NAME"
+#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+/* SMTP server settings */
+#define SMTP_HOST "smtp.gmail.com"
+#define SMTP_PORT 465 // SSL
+/* Email credentials (Gmail APP PASSWORD only) */
+#define AUTHOR_EMAIL "yourgmail@gmail.com"
+#define AUTHOR_PASSWORD "your_16_digit_app_password"
+/* Recipient */
+#define RECIPIENT_EMAIL "receiver@gmail.com"
+/* SMTP session */
+SMTPSession smtp;
+/* Callback */
+void smtpCallback(SMTP_Status status);
+void setup() {
+Serial.begin(115200);
+delay(1000);
+/* WiFi connect */
+Serial.print("Connecting to WiFi");
+WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+while (WiFi.status() != WL_CONNECTED) {
+Serial.print(".");
+delay(300);
+}
+Serial.println("\nWiFi connected");
+Serial.println(WiFi.localIP());
+/* LittleFS init (IMPORTANT for ESP32-C6) */
+if (!LittleFS.begin(true)) {
+Serial.println("LittleFS Mount Failed");
+return;
+}
+/* Enable debug */
+smtp.debug(1);
+smtp.callback(smtpCallback);
+/* Session config */
+Session_Config config;
+config.server.host_name = SMTP_HOST;
+config.server.port = SMTP_PORT;
+config.login.email = AUTHOR_EMAIL;
+config.login.password = AUTHOR_PASSWORD;
+/* Time (required for SSL cert validation) */
+config.time.ntp_server = F("pool.ntp.org,time.nist.gov");
+config.time.gmt_offset = 5.5 * 3600; // India
+config.time.day_light_offset = 0;
+/* Message */
+SMTP_Message message;
+message.sender.name = "ESP32-C6 Mail";
+message.sender.email = AUTHOR_EMAIL;
+message.subject = "ESP32-C6 Email Test";
+message.addRecipient("Receiver", RECIPIENT_EMAIL);
+message.html.content = "ESP32-C6 sending email with attachments using LittleFS ";
+message.html.charSet = "utf-8";
+message.html.transfer_encoding = Content_Transfer_Encoding::enc_qp;
+/* Attachment: image */
+SMTP_Attachment att;
+att.descr.filename = "image.png";
+att.descr.mime = "image/png";
+att.file.path = "/image.png";
+att.file.storage_type = esp_mail_file_storage_type_flash;
+att.descr.transfer_encoding = Content_Transfer_Encoding::enc_base64;
+message.addAttachment(att);
+/* Attachment: text file */
+message.resetAttachItem(att);
+att.descr.filename = "text_file.txt";
+att.descr.mime = "text/plain";
+att.file.path = "/text_file.txt";
+message.addAttachment(att);
+/* Connect SMTP */
+if (!smtp.connect(&config)) {
+Serial.println("SMTP connection failed");
+Serial.println(smtp.errorReason());
+return;
+}
+/* Send mail */
+if (!MailClient.sendMail(&smtp, &message)) {
+Serial.println("Email send failed");
+Serial.println(smtp.errorReason());
+}
+}
+void loop() {
+// nothing
+}
+/* Callback */
+void smtpCallback(SMTP_Status status) {
+Serial.println(status.info());
+if (status.success()) {
+Serial.println("Email sent successfully ");
+smtp.sendingResult.clear();
+}
+}
