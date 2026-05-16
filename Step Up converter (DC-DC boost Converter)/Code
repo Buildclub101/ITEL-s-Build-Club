@@ -1,0 +1,110 @@
+#include <Arduino.h>
+#include <WiFi.h>
+#include <WebServer.h>
+// ====== WiFi Credentials ======
+const char* ssid = "esp32-c6";
+const char* password = "123456789";
+// ====== PWM Config ======
+const int pwmPin = 12;
+int freq = 113000;
+const int ledChannel = 0;
+const int resolution = 8;
+const int period = 255;
+float Dutycycle = 50.0;
+int dutyValue;
+// ====== Web Server ======
+WebServer server(80);
+// ====== Functions ======
+int calculateDuty(float dutyPercent) {
+return (period * (dutyPercent / 100.0f));
+}
+void Set_Duty(int dutyValue) {
+if (dutyValue >= 0 && dutyValue <= period) {
+ledcWrite(ledChannel, dutyValue);
+}
+}
+// ====== HTML Page with Slider & Mobile View ======
+String htmlPage() {
+String page = "<!DOCTYPE html><html><head>";
+page += "<meta name='viewport' content='width=device-width, initial-
+scale=1.0'>";
+
+page += "<title>ESP32 PWM Control</title>";
+page += "<style>";
+page += "body{font-family:Arial;text-align:center;padding:10px;}";
+page += "input[type=number], .slider{width:80%; max-width:300px; margin:10px
+0;}";
+page += "h2, h3{margin:10px 0;}";
+page += "button{padding:10px 20px;font-size:16px;margin:10px 0;}";
+page += "</style></head><body>";
+page += "<h2>ESP32 PWM Control</h2>";
+// Frequency input + submit button
+page += "<h3>Frequency Control</h3>";
+page += "<input type='number' id='freqInput' value='" + String(freq) + "'>";
+page += "<br><button onclick='updateFreq()'>Update
+Frequency</button><br><hr>";
+// Duty cycle slider
+page += "<h3>Duty Cycle Control</h3>";
+page += "<input type='range' min='0' max='100' value='" + String((int)Dutycycle) + "' class='slider' id='pwmSlider' oninput='updateDuty(this.value)'>";
+page += "<p>Duty Cycle: <span id='dutyVal'>" + String((int)Dutycycle) +
+"</span>%</p>";
+// JS AJAX for slider and frequency
+page += "<script>";
+// Duty cycle slider
+page += "function updateDuty(val){";
+page += "document.getElementById('dutyVal').innerText=val;";
+page += "var xhr=new XMLHttpRequest();";
+page += "xhr.open('GET','/set?duty='+val,true);";
+page += "xhr.send();}";
+// Frequency update
+page += "function updateFreq(){";
+page += "var f=document.getElementById('freqInput').value;";
+page += "var xhr=new XMLHttpRequest();";
+page += "xhr.open('GET','/set?freq='+f,true);";
+page += "xhr.send();}";
+page += "</script>";
+page += "</body></html>";
+return page;
+}
+// ====== Web Handlers ======
+void handleRoot() {
+server.send(200, "text/html", htmlPage());
+}
+void handleSet() {
+if (server.hasArg("freq")) {
+freq = server.arg("freq").toInt();
+ledcChangeFrequency(ledChannel, freq, resolution);
+}
+if (server.hasArg("duty")) {
+Dutycycle = server.arg("duty").toFloat();
+dutyValue = calculateDuty(Dutycycle);
+Set_Duty(dutyValue);
+}
+server.send(200, "text/plain", "OK");
+}
+// ====== Setup ======
+void setup() {
+Serial.begin(115200);
+// WiFi AP mode
+WiFi.softAP(ssid, password);
+Serial.print("AP IP Address: ");
+Serial.println(WiFi.softAPIP());
+// Web server routes
+server.on("/", handleRoot);
+server.on("/set", handleSet);
+server.begin();
+// PWM setup (preserve your flow)
+ledcAttach(ledChannel, freq, resolution);
+ledcAttachChannel(pwmPin, freq, resolution, 0);
+dutyValue = calculateDuty(Dutycycle);
+Set_Duty(dutyValue);
+Serial.print("PWM started on GPIO ");
+Serial.print(pwmPin);
+Serial.print(" with duty cycle = ");
+Serial.print(dutyValue);
+Serial.println(" / 255");
+}
+// ====== Loop ======
+void loop() {
+server.handleClient();
+}
