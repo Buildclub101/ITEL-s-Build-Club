@@ -1,0 +1,34 @@
+// Define Ultrasonic sensor pins
+const int trigPin1 = 6; // Right Sensor
+const int echoPin1 = 7;
+const int trigPin2 = 4; // Left Sensor
+const int echoPin2 = 5;
+const int trigPin3 = 13; // Front Sensor
+const int echoPin3 = 12;
+// Function to measure distance
+long getDistance(int trigPin, int echoPin) {
+digitalWrite(trigPin, LOW);
+delayMicroseconds(2);
+digitalWrite(trigPin, HIGH);
+delayMicroseconds(10);
+digitalWrite(trigPin, LOW);
+return pulseIn(echoPin, HIGH) * 0.034 / 2;
+}
+void setup() {
+Serial.begin(115200);
+pinMode(trigPin1, OUTPUT);
+pinMode(echoPin1, INPUT);
+pinMode(trigPin2, OUTPUT);
+pinMode(echoPin2, INPUT);
+pinMode(trigPin3, OUTPUT);
+pinMode(echoPin3, INPUT);
+}
+void loop() {
+long distanceRight = getDistance(trigPin1, echoPin1);
+long distanceLeft = getDistance(trigPin2, echoPin2);
+long distanceFront = getDistance(trigPin3, echoPin3);
+Serial.print("Right: "); Serial.print(distanceRight); Serial.print(" cm, ");
+Serial.print("Left: "); Serial.print(distanceLeft); Serial.print(" cm, ");
+Serial.print("Front: "); Serial.print(distanceFront); Serial.println(" cm");
+delay(500); // Update every half second
+}
