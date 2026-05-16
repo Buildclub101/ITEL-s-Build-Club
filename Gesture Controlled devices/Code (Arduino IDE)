@@ -1,0 +1,38 @@
+#include <Wire.h>
+#include <MPU6050.h>
+#include <math.h>
+MPU6050 mpu;
+int16_t ax, ay, az;
+int16_t gx, gy, gz;
+#define LEFT_BTN 7
+#define RIGHT_BTN 4
+void setup() {
+Serial.begin(115200);
+Wire.begin(5, 6); // SDA=GPIO5, SCL=GPIO6
+pinMode(LEFT_BTN, INPUT_PULLUP);
+pinMode(RIGHT_BTN, INPUT_PULLUP);
+mpu.initialize();
+if (mpu.testConnection()) {
+Serial.println("MPU6050 connected!");
+} else {
+Serial.println("MPU6050 connection failed!");
+}
+}
+void loop() {
+mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+// Convert raw data to tilt angles
+float angleX = atan2(ay, az) * 180.0 / PI; // Roll (left/right)
+float angleY = atan2(-ax, sqrt((long)ay * ay + (long)az * az)) * 180.0 / PI;
+// Pitch (forward/back)
+int left = digitalRead(LEFT_BTN) == LOW ? 1 : 0;
+int right = digitalRead(RIGHT_BTN) == LOW ? 1 : 0;
+// Send data: angleX,angleY,left,right
+Serial.print(angleX, 2);
+Serial.print(",");
+Serial.print(angleY, 2);
+Serial.print(",");
+Serial.print(left);
+Serial.print(",");
+Serial.println(right);
+delay(50);
+}
