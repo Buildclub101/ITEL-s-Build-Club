@@ -1,0 +1,26 @@
+const int LED1 = 3;
+const int LED2 = 4;
+const int LED3 = 5;
+const int LED4 = 6;
+const int LED5 = 7;
+const int LED6 = 8;
+const int LED7 = 9;
+const int LED8 = 10;
+const int LED9 = 18;
+const int LED10 = 19;
+
+void setup()
+{
+// Initialize digital pins as outputs
+pinMode(LED1, OUTPUT);
+pinMode(LED2, OUTPUT);
+// Write the remaining code for other LEDs in the same format.
+}
+void loop()
+{
+digitalWrite(LED1, HIGH); // turn LED1 on
+delay(1000); // wait for 1 second
+digitalWrite(LED1, LOW); // turn LED1 off
+delay(1000); // wait for 1 second
+//Write the remaining code for other LEDs in similar format.
+}
