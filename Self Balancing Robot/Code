@@ -1,0 +1,100 @@
+#include <Wire.h>
+#include <I2Cdev.h>
+#include <PID_v1.h>
+#include "MPU6050_6Axis_MotionApps20.h"
+#define SDA_PIN 21
+#define SCL_PIN 22
+// Motor A pins
+#define IN1 6
+#define IN2 7
+#define ENA 8
+// Motor B pins
+#define IN3 4
+#define IN4 5
+#define ENB 10
+MPU6050 mpu;
+// PID variables
+double input, output, setpoint = 0;
+double Kp = 4.0; // robot oscillates fast.
+double Ki = 10.0;
+double Kd = 1.3;//dampen overshoot.
+PID pid(&input, &output, &setpoint, Kp, Ki, Kd, DIRECT);
+// MPU6050 DMP variables
+bool dmpReady = false;
+uint8_t devStatus;
+uint16_t packetSize;
+uint16_t fifoCount;
+uint8_t fifoBuffer[64];
+Quaternion q;
+VectorFloat gravity;
+float ypr[3];
+float currentAngle;
+void setup() {
+Serial.begin(115200);
+Wire.begin(SDA_PIN, SCL_PIN);
+// Set motor pins
+pinMode(IN1, OUTPUT); pinMode(IN2, OUTPUT); pinMode(ENA,
+OUTPUT);
+pinMode(IN3, OUTPUT); pinMode(IN4, OUTPUT); pinMode(ENB,
+OUTPUT);
+// Initialize MPU6050
+mpu.initialize();
+// Set MPU6050 offsets (tune these based on your calibration)
+mpu.setXAccelOffset(-2500);
+mpu.setYAccelOffset(-4000);
+mpu.setZAccelOffset(1550);
+mpu.setXGyroOffset(65);
+mpu.setYGyroOffset(-30);
+mpu.setZGyroOffset(20);
+devStatus = mpu.dmpInitialize();
+if (devStatus == 0) {
+mpu.setDMPEnabled(true);
+packetSize = mpu.dmpGetFIFOPacketSize();
+dmpReady = true;
+Serial.println("MPU6050 ready with DMP");
+} else {
+Serial.print("DMP init failed (code ");
+Serial.print(devStatus);
+Serial.println(")");
+}
+pid.SetMode(AUTOMATIC);
+pid.SetOutputLimits(-120, 120);
+}
+void loop() {
+if (!dmpReady) return;
+fifoCount = mpu.getFIFOCount();
+if (fifoCount == 1024) {
+mpu.resetFIFO();
+Serial.println("FIFO overflow!");
+return;
+}
+if (fifoCount >= packetSize) {
+mpu.getFIFOBytes(fifoBuffer, packetSize);
+mpu.dmpGetQuaternion(&q, fifoBuffer);
+mpu.dmpGetGravity(&gravity, &q);
+mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+currentAngle = ypr[1] * 180 / M_PI; // Pitch angle in degrees
+input = currentAngle;
+pid.Compute();
+driveMotors(output);
+Serial.print("Angle: ");
+Serial.print(currentAngle);
+Serial.print(" | Output: ");
+Serial.println(output);
+}
+}
+void driveMotors(double pidOut) {
+int motorSpeed = abs(pidOut);
+if (motorSpeed > 120) motorSpeed = 0;
+if (pidOut > 0) {
+// Move backward
+digitalWrite(IN1, LOW); digitalWrite(IN2, HIGH);
+digitalWrite(IN3, LOW); digitalWrite(IN4, HIGH);
+} else {
+// Move forward
+digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
+digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
+}
+analogWrite(ENA, motorSpeed);
+analogWrite(ENB, motorSpeed);
+}
