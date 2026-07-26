@@ -1,0 +1,103 @@
+#include <WiFi.h> 
+#include <WebServer.h> 
+ 
+#define HALL_PIN 3 
+#define PULSES_PER_REV 1 
+ 
+// Wheel parameters 
+#define WHEEL_DIAMETER 0.80   // meters 
+#define PI_VAL 3.1416 
+#define WHEEL_CIRCUMFERENCE (PI_VAL * WHEEL_DIAMETER) 
+ 
+const char* ssid = "GIVE_YOUR_SSID"; 
+const char* password = "GIVE_YOUR_PASSWORD"; 
+ 
+WebServer server(80); 
+ 
+volatile unsigned long pulseCount = 0; 
+unsigned long lastTime = 0; 
+ 
+float rpm = 0; 
+float distance_m = 0; 
+ 
+// Hall sensor interrupt 
+void IRAM_ATTR hallISR() { 
+  pulseCount++; 
+} 
+ 
+// Web page handler 
+void handleRoot() { 
+  String page = "<!DOCTYPE html><html>"; 
+  page += "<head>"; 
+  page += "<meta name='viewport' content='width=device-width, initial-scale=1'>"; 
+  page += "<meta http-equiv='refresh' content='1'>"; 
+  page += "<style>"; 
+  page += "body{font-family:Arial;text-align:center;background:#f2f2f2;}"; 
+  page += "h1{font-size:48px;color:#333;}"; 
+  page += "h2{font-size:28px;color:#555;}"; 
+  page += ".box{background:#fff;padding:20px;margin:20px;border-radius:10px;}"; 
+  page += "</style></head>"; 
+  page += "<body>"; 
+ 
+  page += "<div class='box'>"; 
+  page += "<h2>ESP32-C6 RPM & Odometer</h2>"; 
+  page += "<h1>" + String(rpm, 0) + "</h1>"; 
+  page += "<p>RPM</p>";
+page += "</div>"; 
+ 
+  page += "<div class='box'>"; 
+  page += "<h1>" + String(distance_m, 2) + "</h1>"; 
+  page += "<p>Distance (meters)</p>"; 
+  page += "</div>"; 
+ 
+  page += "</body></html>"; 
+ 
+  server.send(200, "text/html", page); 
+} 
+ 
+void setup() { 
+  Serial.begin(115200); 
+ 
+  pinMode(HALL_PIN, INPUT_PULLUP); 
+  attachInterrupt(digitalPinToInterrupt(HALL_PIN), hallISR, FALLING); 
+ 
+  // Start ESP32-C6 as Access Point 
+  WiFi.mode(WIFI_AP); 
+  WiFi.softAP(ssid, password); 
+ 
+  Serial.println("ESP32-C6 AP Started"); 
+  Serial.print("Connect to WiFi: "); 
+  Serial.println(ssid); 
+  Serial.print("Open browser: "); 
+  Serial.println(WiFi.softAPIP()); 
+ 
+  server.on("/", handleRoot); 
+  server.begin(); 
+ 
+  lastTime = millis(); 
+} 
+ 
+void loop() { 
+  server.handleClient(); 
+ 
+  if (millis() - lastTime >= 1000) {   // 1 second window 
+    noInterrupts(); 
+    unsigned long pulses = pulseCount; 
+    pulseCount = 0; 
+    interrupts(); 
+ 
+    // RPM calculation 
+    rpm = (pulses * 30.0) / PULSES_PER_REV; 
+ 
+    // Distance calculation
+float rev_per_sec = rpm / 60.0; 
+float distance_per_sec = rev_per_sec * WHEEL_CIRCUMFERENCE; 
+distance_m += distance_per_sec; 
+Serial.print("RPM: "); 
+Serial.print(rpm); 
+Serial.print(" | Distance: "); 
+Serial.print(distance_m, 2); 
+Serial.println(" m"); 
+lastTime = millis(); 
+} 
+} 
