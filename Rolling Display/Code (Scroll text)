@@ -29,8 +29,6 @@ int textWidth = text.length() * 6; // Each character is 6 pixels wide
 for (int i = numberOfHorizontalDisplays * 8; i>-textWidth; i--) 
 // To scroll text from right to left
 { 
-} 
-} 
 matrix.fillScreen(LOW);   
 matrix.setCursor(i, 1);   
 matrix.print(text);  
